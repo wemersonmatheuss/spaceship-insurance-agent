@@ -1,11 +1,12 @@
 import streamlit as st
-import pickle
 import json
 import pandas as pd
 from openai import OpenAI
-
 from dotenv import load_dotenv
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
 import os
+
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -19,13 +20,6 @@ st.set_page_config(
 # ── Carregar modelo ────────────────────────────────────────────────
 @st.cache_resource
 def carregar_modelo():
-    import os
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.model_selection import train_test_split
-    from sklearn.preprocessing import LabelEncoder
-    import pickle
-
-    # Treina o modelo na hora se não tiver o pkl
     df = pd.read_csv("data/train.csv")
     features = ["HomePlanet", "CryoSleep", "Destination", "Age",
                 "VIP", "RoomService", "FoodCourt", "ShoppingMall",
@@ -43,6 +37,7 @@ def carregar_modelo():
     model.fit(X, y)
     return model
 
+model = carregar_modelo()
 
 # ══════════════════════════════════════════════════════════════════
 # FERRAMENTAS
@@ -177,24 +172,21 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("#### 👤 Perfil do Passageiro")
-    idade       = st.number_input("Idade", min_value=1, max_value=120, value=34)
-    planeta     = st.selectbox("Planeta de Origem", ["Europa", "Terra", "Marte"])
-    destino     = st.selectbox("Destino", ["TRAPPIST-1e", "55 Cancri e", "PSO J318.5-22"])
-    cryosleep   = st.toggle("Em CryoSleep?")
-    vip         = st.toggle("Passageiro VIP?")
+    idade         = st.number_input("Idade", min_value=1, max_value=120, value=34)
+    planeta       = st.selectbox("Planeta de Origem", ["Europa", "Terra", "Marte"])
+    destino       = st.selectbox("Destino", ["TRAPPIST-1e", "55 Cancri e", "PSO J318.5-22"])
+    cryosleep     = st.toggle("Em CryoSleep?")
+    vip           = st.toggle("Passageiro VIP?")
 
 with col2:
     st.markdown("#### 💳 Gastos nas Amenidades (GalacticCredits)")
-    room_service  = st.number_input("Room Service",   min_value=0, value=0)
-    food_court    = st.number_input("Food Court",     min_value=0, value=0)
-    shopping_mall = st.number_input("Shopping Mall",  min_value=0, value=0)
-    spa           = st.number_input("Spa",            min_value=0, value=200)
-    vrdeck        = st.number_input("VR Deck",        min_value=0, value=500)
+    room_service  = st.number_input("Room Service",  min_value=0, value=0)
+    food_court    = st.number_input("Food Court",    min_value=0, value=0)
+    shopping_mall = st.number_input("Shopping Mall", min_value=0, value=0)
+    spa           = st.number_input("Spa",           min_value=0, value=200)
+    vrdeck        = st.number_input("VR Deck",       min_value=0, value=500)
 
 st.divider()
-
-planeta_map  = {"Europa": 1, "Terra": 0, "Marte": 2}
-destino_map  = {"TRAPPIST-1e": 2, "55 Cancri e": 0, "PSO J318.5-22": 1}
 
 if st.button("🔍 Analisar Risco e Gerar Proposta", use_container_width=True):
     pergunta = (
@@ -210,12 +202,10 @@ if st.button("🔍 Analisar Risco e Gerar Proposta", use_container_width=True):
     with st.spinner("Agente analisando o perfil..."):
         proposta, log = agente(pergunta)
 
-    # ── Resultado do modelo ────────────────────────────────────────
     risco_raw = None
     for entry in log:
         if entry["ferramenta"] == "prever_risco":
-            dados_risco = json.loads(entry["resultado"])
-            risco_raw   = dados_risco
+            risco_raw = json.loads(entry["resultado"])
 
     if risco_raw:
         st.markdown("### 📊 Resultado do Modelo de ML")
@@ -227,13 +217,11 @@ if st.button("🔍 Analisar Risco e Gerar Proposta", use_container_width=True):
 
     st.divider()
 
-    # ── Proposta do agente ─────────────────────────────────────────
     st.markdown("### 📄 Proposta de Seguro Gerada pelo Agente")
     st.markdown(proposta)
 
     st.divider()
 
-    # ── Log do ReAct ──────────────────────────────────────────────
     with st.expander("🔎 Ver log do loop ReAct"):
         for entry in log:
             st.markdown(f"**Passo {entry['passo']} → `{entry['ferramenta']}`**")
