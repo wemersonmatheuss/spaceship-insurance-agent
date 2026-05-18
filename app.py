@@ -19,10 +19,29 @@ st.set_page_config(
 # ── Carregar modelo ────────────────────────────────────────────────
 @st.cache_resource
 def carregar_modelo():
-    with open("model.pkl", "rb") as f:
-        return pickle.load(f)
+    import os
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import LabelEncoder
+    import pickle
 
-model = carregar_modelo()
+    # Treina o modelo na hora se não tiver o pkl
+    df = pd.read_csv("data/train.csv")
+    features = ["HomePlanet", "CryoSleep", "Destination", "Age",
+                "VIP", "RoomService", "FoodCourt", "ShoppingMall",
+                "Spa", "VRDeck"]
+    df = df[features + ["Transported"]].dropna()
+    le = LabelEncoder()
+    for col in ["HomePlanet", "Destination"]:
+        df[col] = le.fit_transform(df[col])
+    df["CryoSleep"]   = df["CryoSleep"].astype(int)
+    df["VIP"]         = df["VIP"].astype(int)
+    df["Transported"] = df["Transported"].astype(int)
+    X = df[features]
+    y = df["Transported"]
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X, y)
+    return model
 
 
 # ══════════════════════════════════════════════════════════════════
